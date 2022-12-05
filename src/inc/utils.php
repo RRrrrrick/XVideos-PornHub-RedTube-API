@@ -3,55 +3,64 @@
 include 'user_agent.php';
 
 class Utils {
-    public static function get_url_content($url, $cookie = false, $bypass = false) {
-        $user_agent = \Campo\UserAgent::random( array( 'device_type' => 'Desktop' ) );;
+    public static function get_url_content($url, $bypass = false) {
+        $user_agent = \Campo\UserAgent::random(array('device_type' => 'Desktop'));
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? $user_agent;
-        $headers    = ['Cache-Control: no-cache'];
-        $curl       = curl_init();
-        $options    = [
+
+        $headers = ['Cache-Control: no-cache'];
+
+        $curl = curl_init();
+
+        $options = [
             CURLOPT_URL            => $url,
             CURLOPT_USERAGENT      => $user_agent,
             CURLOPT_AUTOREFERER    => true,
-            CURLOPT_FRESH_CONNECT  => true,
+            CURLOPT_FRESH_CONNECT  => false,
             CURLOPT_HTTPHEADER     => $headers,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_MAXREDIRS      => 10,
             CURLOPT_CONNECTTIMEOUT => CONNECTTIMEOUT,
             CURLOPT_TIMEOUT        => TIMEOUT,
-            CURLOPT_RETURNTRANSFER => true
-            // CURLOPT_SSL_VERIFYPEER => false
+            CURLOPT_RETURNTRANSFER => true,
         ];
+
         if ($bypass) {
             $options[CURLOPT_COOKIE] = self::get_url_content(BYPASS_URL . '/?url=' . $url);
         }
-        if ($cookie) {
-            $options[CURLOPT_COOKIEFILE] = dirname(__FILE__) . '/tmp/cookie.txt';
-        }
+
         curl_setopt_array($curl, $options);
+
         $content = curl_exec($curl);
+
         curl_close($curl);
+
         return $content;
     }
 
     public static function get_redirect_url($url) {
-        $ch      = curl_init($url);
+        $ch = curl_init($url);
+
         $options = [
             CURLOPT_HEADER         => false,
             CURLOPT_NOBODY         => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_CONNECTTIMEOUT => CONNECTTIMEOUT,
-            CURLOPT_TIMEOUT        => TIMEOUT
+            CURLOPT_TIMEOUT        => TIMEOUT,
         ];
+
         curl_setopt_array($ch, $options);
         curl_exec($ch);
+
         $redirect_url = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+
         curl_close($ch);
+
         return $redirect_url;
     }
 
     public static function get_multiple_urls($urls) {
-        $user_agent = \Campo\UserAgent::random( array( 'device_type' => 'Desktop' ) );;
+        $user_agent = \Campo\UserAgent::random(array('device_type' => 'Desktop'));
         $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? $user_agent;
 
         $curl   = [];
@@ -62,29 +71,27 @@ class Utils {
         $headers = ['Cache-Control: no-cache'];
 
         foreach ($urls as $id => $data) {
-            $url = $data['url'];
+            $url       = $data['url'];
             $curl[$id] = curl_init($url);
 
             $options = [
                 CURLOPT_USERAGENT      => $user_agent,
                 CURLOPT_AUTOREFERER    => true,
-                CURLOPT_FRESH_CONNECT  => true,
+                CURLOPT_FRESH_CONNECT  => false,
                 CURLOPT_HTTPHEADER     => $headers,
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_MAXREDIRS      => 5,
                 CURLOPT_CONNECTTIMEOUT => CONNECTTIMEOUT,
                 CURLOPT_TIMEOUT        => TIMEOUT,
-                CURLOPT_RETURNTRANSFER => true
-                // CURLOPT_SSL_VERIFYPEER => false
+                CURLOPT_RETURNTRANSFER => true,
             ];
+
             if ($data['bypass']) {
                 $cookie = self::get_url_content(BYPASS_URL . '/?url=' . $url);
+
                 if (!empty($cookie)) {
                     $options[CURLOPT_COOKIE] = $cookie;
                 }
-            }
-            if ($data['cookie']) {
-                $options[CURLOPT_COOKIEJAR] = dirname(__FILE__) . '/tmp/cookie.txt';
             }
 
             curl_setopt_array($curl[$id], $options);
@@ -92,37 +99,47 @@ class Utils {
         }
 
         $running = null;
+
         LoadTime::start('gmu');
+
         do {
             curl_multi_exec($mh, $running);
         } while ($running);
+
         LoadTime::end('gmu');
 
         foreach ($urls as $id => $url) {
             $result[$id] = curl_multi_getcontent($curl[$id]);
             curl_multi_remove_handle($mh, $curl[$id]);
         }
+
         curl_multi_close($mh);
+
         return $result;
     }
 
     public static function get_http_code($url) {
-        $ch      = curl_init($url);
+        $ch = curl_init($url);
+
         $options = [
             CURLOPT_HEADER         => true,
             CURLOPT_NOBODY         => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CONNECTTIMEOUT => CONNECTTIMEOUT,
-            CURLOPT_TIMEOUT        => TIMEOUT
+            CURLOPT_TIMEOUT        => TIMEOUT,
         ];
+
         curl_setopt_array($ch, $options);
         curl_exec($ch);
+
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
         curl_close($ch);
+
         return $http_code;
     }
 
-    public static function match($regex, $content) {
+    public static function _match($regex, $content) {
         preg_match('#' . $regex . '#', $content, $match);
         return $match[1] ?? null;
     }
@@ -136,7 +153,7 @@ class Utils {
     }
 
     public static function add_missing_data($source, $data, &$missing_data) {
-        if ($source == '') {
+        if ($source === '') {
             if (!in_array($data, $missing_data)) {
                 $missing_data[] = $data;
             }
@@ -170,9 +187,10 @@ class Utils {
 
     public static function remove_parent_array($from, &$to, $parent) {
         foreach ($from as $key => $value) {
-            if ($key == $parent) {
+            if ($key === $parent) {
                 if (is_array($value)) {
                     unset($to[$key]);
+
                     foreach ($value as $key => $value) {
                         $to[$key] = $value;
                     }
@@ -189,6 +207,7 @@ class Utils {
     public static function remove_multiple_parent_array(&$from) {
         $num_args = func_num_args();
         $args     = func_get_args();
+
         for ($i = 1; $i < $num_args; $i++) {
             $to = [];
             self::remove_parent_array($from, $to, $args[$i]);
@@ -198,6 +217,7 @@ class Utils {
 
     public static function is_empty_array($arr) {
         $empty = true;
+
         foreach ($arr as $value) {
             if (is_array($value)) {
                 $empty = self::is_empty_array($value);
@@ -207,17 +227,20 @@ class Utils {
                 }
             }
         }
+
         return $empty;
     }
 
     public static function get_image_size($img) {
         $img_data = getimagesize($img);
+
         if ($img_data) {
             preg_match('/width="(.*?)"/', $img_data[3], $tmp);
             $width = $tmp[1];
 
             preg_match('/height="(.*?)"/', $img_data[3], $tmp);
             $height = $tmp[1];
+
             return ['width' => $width, 'height' => $height];
         }
     }
